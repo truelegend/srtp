@@ -64,7 +64,6 @@ void CSrtpBidirectStream::SendSRTP(int rtp_len)
     int n = sendto(m_rtp_sockfd,m_pRtpTranslator->m_pkg_buffer,rtp_len,
     	0,(struct sockaddr *)&m_peeraddr, sizeof(m_peeraddr));
     LOG(DEBUG,"%d srtp bytes data has been sent out successfully", n);
-    //printf("have sent %d packages\n", n);
 }
 int CSrtpBidirectStream::ReceiveSRTP()
 {   

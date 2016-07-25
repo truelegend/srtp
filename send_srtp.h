@@ -12,9 +12,6 @@
 #include <unistd.h>
 #include <assert.h>
 #include <iostream>
-//#include "srtp.h"
-//#include "util.h"
-//#include "srtppkgtranslator.h"
 #include "srtpbidirectstream.h"
 #include "log.h"
 

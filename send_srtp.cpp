@@ -106,7 +106,6 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
 	    return;
     }
     u_short port = ntohs(*(u_short*) (pkt_data+14+20));
-    //u_short port = ntohs(*p_port);
     isRTCP = (port%2==0)?false:true;
     LOG(DEBUG,"the port number is %d, isRTCP is %d", port, isRTCP);
 
@@ -280,6 +279,7 @@ int main(int argc, char **argv)
         LOG(DEBUG,"start to handle pcap file, into loop");
     	pcap_loop(fp, 0, dispatcher_handler, (u_char* )&bidstream);
     }
+    // we have to wait sometime in case the last srtp pkg can be received by the receiving thread
     usleep(1000000000);
     pcap_close(fp);
     CSrtppkgTranslator::DeInitSrtpLib();

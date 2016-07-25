@@ -9,7 +9,12 @@ CLog::CLog()
     	printf("unable to open log file, exit\n");
     	exit(1);
     }
-    mutex_x = PTHREAD_MUTEX_INITIALIZER;
+    //mutex_x = PTHREAD_MUTEX_INITIALIZER;
+    int ret = pthread_mutex_init(&mutex_x, NULL);
+    if (ret != 0)
+    {
+    	printf("error happend when try to initialize mutex\n");
+    }
 }
 CLog::~CLog()
 {
@@ -21,6 +26,11 @@ CLog::~CLog()
    {
        fclose(m_logfile);
    }
+   int ret = pthread_mutex_destroy(&mutex_x);
+   if (ret != 0)
+    {
+    	printf("error happend when try to deinitialize mutex\n");
+    }
 }
 CLog* CLog::GetInstance()
 {
@@ -38,7 +48,6 @@ void CLog::WriteLog(const char* func,const char* codeFile, long codeLine,int lev
 	va_start(args, format);
 	vsprintf(str, format, args);
 	va_end(args);
-
 	//struct timeval time;
 	//gettimeofday(&time,NULL);
 	time_t tNow;

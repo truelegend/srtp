@@ -1,0 +1,1 @@
+g++ -o send_srtp  send_srtp.cpp srtppkgtranslator.cpp util.c srtpbidirectstream.cpp  srtpbidirectstream.cpp -lpcap -L . -lsrtp2

@@ -6,7 +6,7 @@ all: send_srtp
 .PHONY: all
 
 send_srtp: send_srtp.o srtppkgtranslator.o srtpbidirectstream.o log.o
-	g++ -o send_srtp send_srtp.o srtppkgtranslator.o srtpbidirectstream.o log.o -lpcap -L . -lsrtp2 
+	g++ -o send_srtp send_srtp.o srtppkgtranslator.o srtpbidirectstream.o log.o -lpcap -L . -lsrtp2 -lpthread
 
 send_srtp.o: send_srtp.h srtp.h srtpbidirectstream.h srtppkgtranslator.h log.h
 

@@ -4,9 +4,9 @@
 struct timeval pre_time;
 struct timeval cur_time;
 
-unsigned int sent_rtp_num = 0;
+unsigned int sent_rtp_num  = 0;
 unsigned int sent_rtcp_num = 0;
-unsigned int recv_rtp_num = 0;
+unsigned int recv_rtp_num  = 0;
 unsigned int recv_rtcp_num = 0;
 
 
@@ -133,46 +133,47 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
         {
             LOG(DEBUG,"send srtcp");
             p_stream->SendSRTCP(pkg_app_len);
+            sent_rtcp_num++;
         }
         else
         {
             LOG(DEBUG,"send srtp");
             p_stream->SendSRTP(pkg_app_len);
-        }        	   
-        sent_rtp_num++;	
-	pre_time = header->ts;
+            sent_rtp_num++; 
+        }        	           
+	    pre_time = header->ts;
     }
     else
     {
         cur_time = header->ts;
-	unsigned int interval = (cur_time.tv_sec - pre_time.tv_sec) * 1000 * 1000 + (cur_time.tv_usec - pre_time.tv_usec);
+	    unsigned int interval = (cur_time.tv_sec - pre_time.tv_sec) * 1000 * 1000 + (cur_time.tv_usec - pre_time.tv_usec);
         usleep(interval);
         if (isRTCP)
         {
             LOG(DEBUG,"send srtcp");
             p_stream->SendSRTCP(pkg_app_len);
-	    sent_rtcp_num++;
+	        sent_rtcp_num++;
         }
         else
         {
             LOG(DEBUG,"send srtp");
             p_stream->SendSRTP(pkg_app_len);
-	    sent_rtp_num++;
+	        sent_rtp_num++;
         }        
         pre_time = cur_time;
     }
+    LOG(DEBUG,"this is the %d srtp sent out, %d srtcp sent out", sent_rtp_num,sent_rtcp_num);
     if (isRTCP)
     {
         LOG(DEBUG,"will never receive the SRTCP from peer, so just return\n");
         return;
     }
-    int recv_spkg_app_len = p_stream->ReceiveSRTP();
+    /*int recv_spkg_app_len = p_stream->ReceiveSRTP();
     LOG(DEBUG,"have received %d bytes succesfully", recv_spkg_app_len);
     recv_rtp_num++;
     int spkg_app_len = recv_spkg_app_len;
 
     p_stream->m_pSrtpTranslator->DecodeSRTP(&spkg_app_len);
-    //printf("the decoded srtp length is %d\n", spkg_app_len);
     LOG(DEBUG,"the decoded srtp length is %d", spkg_app_len);
 
     if ((recv_spkg_app_len != pkg_app_len) || (orig_pkg_app_len != spkg_app_len))
@@ -188,12 +189,42 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
     }
     else
     {
-        //printf("there is something wrong in encoding or decoding\n");
         LOG(ERROR,"there is something wrong in encoding or decoding");
         exit(1);
+    }*/
+}
+void* ReceiveDataThread(void *p)
+{
+    CSrtpBidirectStream *p_stream = (CSrtpBidirectStream *)p;
+    while(1)
+    {
+        int recv_spkg_app_len = p_stream->ReceiveSRTP();
+        LOG(DEBUG,"have received %d bytes succesfully", recv_spkg_app_len);
+        recv_rtp_num++;
+        LOG(DEBUG,"this is the %d srtp received", recv_rtp_num);
+        int spkg_app_len = recv_spkg_app_len;
+
+        p_stream->m_pSrtpTranslator->DecodeSRTP(&spkg_app_len);
+        LOG(DEBUG,"the decoded srtp length is %d", spkg_app_len);
+
+        /*if ((recv_spkg_app_len != pkg_app_len) || (orig_pkg_app_len != spkg_app_len))
+        {
+            //printf("the spkg_app_len is not equal to pkg_app_len, exit\n");
+            LOG(ERROR,"the spkg_app_len is not equal to pkg_app_len, exit");
+            exit(1);
+        }
+    
+        if (CompareMem(pkt_data+14+20+8,p_stream->m_pSrtpTranslator->m_pkg_buffer,spkg_app_len))
+        {
+            LOG(DEBUG,"succesfully encode&decode, well done!\n");
+        }
+        else
+        {
+            LOG(ERROR,"there is something wrong in encoding or decoding");
+            exit(1);
+        }*/
     }
 }
-
 int main(int argc, char **argv)
 {      
     CArgumentsHandler argumentsHandler(argc,argv);
@@ -228,7 +259,13 @@ int main(int argc, char **argv)
         LOG(ERROR,"binding local rtcp failed");
         exit(1);
     }
-    
+    pthread_t thd_receiver;
+    int ret = pthread_create(&thd_receiver,NULL,ReceiveDataThread,&bidstream);
+    if (ret)
+    {
+        LOG(ERROR,"failed to create receiving thread, error No. is %d", ret);
+        exit(1);
+    }
     pcap_t *fp;
     const char *filename = argumentsHandler.m_pcap_file;
     char errbuf[50];
@@ -241,8 +278,9 @@ int main(int argc, char **argv)
     else
     { 
         LOG(DEBUG,"start to handle pcap file, into loop");
-    	pcap_loop(fp, 0, dispatcher_handler, (u_char*)(&bidstream));
+    	pcap_loop(fp, 0, dispatcher_handler, (u_char* )&bidstream);
     }
+    usleep(1000000000);
     pcap_close(fp);
     CSrtppkgTranslator::DeInitSrtpLib();
     printf("all done, total sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d\n", sent_rtp_num, sent_rtcp_num, recv_rtp_num);

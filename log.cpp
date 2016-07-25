@@ -15,10 +15,6 @@ CLog::CLog()
     {
     	printf("error happend when try to initialize mutex\n");
     }
-<<<<<<< HEAD
-=======
-
->>>>>>> 98038ac5fe8ad3b784e827df548b4d58ef93e54a
 }
 CLog::~CLog()
 {
@@ -30,11 +26,9 @@ CLog::~CLog()
    {
        fclose(m_logfile);
    }
-<<<<<<< HEAD
+
    int ret = pthread_mutex_destroy(&mutex_x);
-=======
-   int ret = pthread_mutex_destroy(&mutex_x, NULL);
->>>>>>> 98038ac5fe8ad3b784e827df548b4d58ef93e54a
+
    if (ret != 0)
     {
     	printf("error happend when try to deinitialize mutex\n");

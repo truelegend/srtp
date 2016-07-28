@@ -14,6 +14,7 @@
 #include <iostream>
 #include "srtpbidirectstream.h"
 #include "log.h"
+#include "rtpqueue.h"
 
 
 class CArgumentsHandler

@@ -111,7 +111,7 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
 
     int pkg_app_len = header->len-42;  // 42 = 14 mac + 20 ip hdr + 8 udp hdr
     int orig_pkg_app_len = pkg_app_len;
-    memcpy(p_stream->m_pRtpTranslator->m_pkg_buffer,pkt_data+14+20+8,pkg_app_len);
+    memcpy(p_stream->m_pRtpTranslator->m_pkg_buffer,pkt_data+14+20+8,orig_pkg_app_len);
     //printf("pkg_app_len is :%d before protection\n", pkg_app_len);
     // need to input the whole rtp pkg len, not just the payload
     if (isRTCP)
@@ -167,6 +167,12 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
         LOG(DEBUG,"will never receive the SRTCP from peer, so just return\n");
         return;
     }
+    else
+    {
+        LOG(DEBUG,"for sent srtp, we'll cache the original rtp pkg");
+        int rear = p_stream->m_rtpque.EnQueue(pkt_data+14+20+8,orig_pkg_app_len);
+        LOG(DEBUG,"the enqueued rear is %d", rear);
+    }
     /*int recv_spkg_app_len = p_stream->ReceiveSRTP();
     LOG(DEBUG,"have received %d bytes succesfully", recv_spkg_app_len);
     recv_rtp_num++;
@@ -205,7 +211,13 @@ void* ReceiveDataThread(void *p)
 
         p_stream->m_pSrtpTranslator->DecodeSRTP(&spkg_app_len);
         LOG(DEBUG,"the decoded srtp length is %d", spkg_app_len);
-
+        RAW_RTP *pRTP = p_stream->m_rtpque.DeQueue();
+        if (!pRTP)
+        {
+            LOG(WARNING, "failed to get rtp from queue, anyway continue");
+            continue;
+        }
+        p_stream->m_rtpque.FreeCachedRTP(pRTP);
         /*if ((recv_spkg_app_len != pkg_app_len) || (orig_pkg_app_len != spkg_app_len))
         {
             //printf("the spkg_app_len is not equal to pkg_app_len, exit\n");
@@ -280,7 +292,7 @@ int main(int argc, char **argv)
     	pcap_loop(fp, 0, dispatcher_handler, (u_char* )&bidstream);
     }
     // we have to wait sometime in case the last srtp pkg can be received by the receiving thread
-    usleep(1000000000);
+    usleep(100000);
     pcap_close(fp);
     CSrtppkgTranslator::DeInitSrtpLib();
     printf("all done, total sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d\n", sent_rtp_num, sent_rtcp_num, recv_rtp_num);

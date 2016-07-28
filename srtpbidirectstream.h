@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "srtppkgtranslator.h"
+#include "rtpqueue.h"
 #include "log.h"
 //#include "send_srtp.h"
 class CSrtpBidirectStream
@@ -24,6 +25,7 @@ class CSrtpBidirectStream
         
         CSrtppkgTranslator    *m_pSrtpTranslator;
         CSrtppkgTranslator    *m_pRtpTranslator;
+        CRtpQueue              m_rtpque;
 
     private:
         

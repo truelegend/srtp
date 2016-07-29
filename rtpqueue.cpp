@@ -21,7 +21,7 @@ int CRtpQueue::EnQueue(const unsigned char *p, int len)
 		return -1;
 	}
 	rear = (rear+1)%MAX_CACHED_RTP_NUM;
-	m_raw_rtp_array[rear].p_pkg = new char[len];
+	m_raw_rtp_array[rear].p_pkg = new u_char[len];
 	if (!m_raw_rtp_array[rear].p_pkg)
 	{
 		LOG(WARNING,"failed to allocate new memory");
@@ -47,6 +47,7 @@ RAW_RTP* CRtpQueue::DeQueue()
 }
 void CRtpQueue::FreeCachedRTP(RAW_RTP *p)
 {
+	LOG(DEBUG,"free the memory for RAW_RTP");
 	delete [] p->p_pkg;
 	p->pkg_len = 0;
 }

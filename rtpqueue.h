@@ -6,7 +6,7 @@
 struct RAW_RTP
 {
     int pkg_len;
-    char* p_pkg;
+    u_char* p_pkg;
 };
 class CRtpQueue
 {

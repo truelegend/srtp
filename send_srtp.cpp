@@ -9,6 +9,7 @@ unsigned int sent_rtcp_num = 0;
 unsigned int recv_rtp_num  = 0;
 unsigned int recv_rtcp_num = 0;
 
+pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 CArgumentsHandler::CArgumentsHandler(int argc, char **argv)
 {
@@ -53,7 +54,6 @@ bool CArgumentsHandler::VerifyArguments()
     {
         return false;
     }
-    
     return true;
 }
 bool CArgumentsHandler::IsBase64keyCorrect(const char *str)
@@ -126,6 +126,14 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
     }
     
     //printf("pkg_app_len is :%d after protection\n", pkg_app_len);
+    if (!isRTCP)
+    {
+        LOG(DEBUG,"for sent srtp, we'll cache the original rtp pkg");
+        pthread_mutex_lock(&g_mutex);   
+        int rear = p_stream->m_rtpque.EnQueue(pkt_data+14+20+8,orig_pkg_app_len);
+        pthread_mutex_unlock(&g_mutex);     
+        LOG(DEBUG,"the enqueued rear is %d", rear);
+    }
     if(sent_rtp_num == 0)
     {
         if(isRTCP)
@@ -162,41 +170,11 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
         pre_time = cur_time;
     }
     LOG(DEBUG,"this is the %d srtp sent out, %d srtcp sent out", sent_rtp_num,sent_rtcp_num);
-    if (isRTCP)
-    {
-        LOG(DEBUG,"will never receive the SRTCP from peer, so just return\n");
-        return;
-    }
-    else
-    {
-        LOG(DEBUG,"for sent srtp, we'll cache the original rtp pkg");
-        int rear = p_stream->m_rtpque.EnQueue(pkt_data+14+20+8,orig_pkg_app_len);
-        LOG(DEBUG,"the enqueued rear is %d", rear);
-    }
-    /*int recv_spkg_app_len = p_stream->ReceiveSRTP();
-    LOG(DEBUG,"have received %d bytes succesfully", recv_spkg_app_len);
-    recv_rtp_num++;
-    int spkg_app_len = recv_spkg_app_len;
-
-    p_stream->m_pSrtpTranslator->DecodeSRTP(&spkg_app_len);
-    LOG(DEBUG,"the decoded srtp length is %d", spkg_app_len);
-
-    if ((recv_spkg_app_len != pkg_app_len) || (orig_pkg_app_len != spkg_app_len))
-    {
-        //printf("the spkg_app_len is not equal to pkg_app_len, exit\n");
-        LOG(ERROR,"the spkg_app_len is not equal to pkg_app_len, exit");
-        exit(1);
-    }
-    
-    if (CompareMem(pkt_data+14+20+8,p_stream->m_pSrtpTranslator->m_pkg_buffer,spkg_app_len))
-    {
-        LOG(DEBUG,"succesfully encode&decode, well done!\n");
-    }
-    else
-    {
-        LOG(ERROR,"there is something wrong in encoding or decoding");
-        exit(1);
-    }*/
+}
+u_short GetRtpSeq(u_char *pRTP)
+{
+    u_short seq = ntohs(*((u_short*)(pRTP+2)));
+    return seq;
 }
 void* ReceiveDataThread(void *p)
 {
@@ -211,29 +189,54 @@ void* ReceiveDataThread(void *p)
 
         p_stream->m_pSrtpTranslator->DecodeSRTP(&spkg_app_len);
         LOG(DEBUG,"the decoded srtp length is %d", spkg_app_len);
-        RAW_RTP *pRTP = p_stream->m_rtpque.DeQueue();
-        if (!pRTP)
+        u_short seq = GetRtpSeq(p_stream->m_pSrtpTranslator->m_pkg_buffer);
+        LOG(DEBUG,"the received seq is %d", seq);
+        pthread_mutex_lock(&g_mutex);   
+        RAW_RTP *pStructRTP = p_stream->m_rtpque.DeQueue();
+        if (!pStructRTP)
         {
-            LOG(WARNING, "failed to get rtp from queue, anyway continue");
-            continue;
-        }
-        p_stream->m_rtpque.FreeCachedRTP(pRTP);
-        /*if ((recv_spkg_app_len != pkg_app_len) || (orig_pkg_app_len != spkg_app_len))
-        {
-            //printf("the spkg_app_len is not equal to pkg_app_len, exit\n");
-            LOG(ERROR,"the spkg_app_len is not equal to pkg_app_len, exit");
+            LOG(ERROR, "failed to get rtp from queue, abnormal exit");
             exit(1);
         }
-    
-        if (CompareMem(pkt_data+14+20+8,p_stream->m_pSrtpTranslator->m_pkg_buffer,spkg_app_len))
+        
+        while(spkg_app_len != pStructRTP->pkg_len)
+        {
+            p_stream->m_rtpque.FreeCachedRTP(pStructRTP); // destroy the useless head in case memory leak
+            LOG(WARNING,"the cached rtp length is not equal to the decoded one, get the next element until they are equal");
+            pStructRTP = p_stream->m_rtpque.DeQueue();
+            if (!pStructRTP)
+            {
+                LOG(WARNING, "failed to get rtp from queue, abnormal exit");
+                exit(1);
+            }
+        }   
+        // check if the rtp sequence is equal 
+
+        while(seq > GetRtpSeq(pStructRTP->p_pkg))
+        {
+            LOG(WARNING,"the cached rtp seq is smaller than the decoded one, there must be pkg loss, to get the next one from queue");
+            p_stream->m_rtpque.FreeCachedRTP(pStructRTP); // destroy the useless head in case memory leak
+            pStructRTP = p_stream->m_rtpque.DeQueue();
+            if (!pStructRTP)
+            {
+                LOG(WARNING, "failed to get rtp from queue, abnormal exit");
+                exit(1);
+            }
+        }
+        LOG(DEBUG,"now we can compare the two pkg since the length and seq are all equal");
+        if (CompareMem(pStructRTP->p_pkg,p_stream->m_pSrtpTranslator->m_pkg_buffer,spkg_app_len))
         {
             LOG(DEBUG,"succesfully encode&decode, well done!\n");
+            p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
+            pthread_mutex_unlock(&g_mutex); 
         }
         else
         {
-            LOG(ERROR,"there is something wrong in encoding or decoding");
+            LOG(ERROR,"the comparing failed, there must be something wrong in encoding or decoding");
+            p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
+            pthread_mutex_unlock(&g_mutex); 
             exit(1);
-        }*/
+        }    
     }
 }
 int main(int argc, char **argv)

@@ -24,6 +24,15 @@ CSrtpBidirectStream::CSrtpBidirectStream(char *local_addr,unsigned int local_por
     m_peeraddr_rtcp.sin_addr.s_addr = inet_addr(peer_addr);
 
     m_rtp_sockfd = socket(AF_INET,SOCK_DGRAM,0);
+    LOG(DEBUG,"set the receiving rtp sockfd TIMEOUT timer");
+    timeval tv;
+    tv.tv_sec = TIMEOUT;
+    tv.tv_usec = 0;
+    if(setsockopt(m_rtp_sockfd,SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) != 0)
+    {
+        LOG(ERROR,"failed to set TIMEOUT for receiving socket");
+        exit(1);
+    }
     m_rtcp_sockfd = socket(AF_INET,SOCK_DGRAM,0);
 }
 CSrtpBidirectStream::~CSrtpBidirectStream()
@@ -75,17 +84,11 @@ int CSrtpBidirectStream::ReceiveSRTP()
     unsigned int addr_len = sizeof(m_peeraddr);
     int n = recvfrom(m_rtp_sockfd,m_pSrtpTranslator->m_pkg_buffer,MAX_PKG_LEN,0,
     	(struct sockaddr *)&m_peeraddr, &addr_len);
-    if(n <= 0)
+    if (n)
     {
-        LOG(ERROR,"receiving SRTP failed");
-    	exit(1);
-    }
-    else
-    {
-    	//printf("%d bytes received from peer address %s\n", n, inet_ntoa(m_peeraddr.sin_addr));
-        LOG(DEBUG,"%d bytes data received from peer address %s", n, inet_ntoa(m_peeraddr.sin_addr));
-    	return n;
-    }
+        LOG(DEBUG,"%d bytes data received from peer address %s\n", n, inet_ntoa(m_peeraddr_rtcp.sin_addr));
+    }    
+    return n;
 }
 void CSrtpBidirectStream::SendSRTCP(int rtcp_len)
 {   

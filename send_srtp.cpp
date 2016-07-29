@@ -176,12 +176,17 @@ u_short GetRtpSeq(u_char *pRTP)
     u_short seq = ntohs(*((u_short*)(pRTP+2)));
     return seq;
 }
-void* ReceiveDataThread(void *p)
+void* ReceiveSrtpThread(void *p)
 {
     CSrtpBidirectStream *p_stream = (CSrtpBidirectStream *)p;
     while(1)
     {
         int recv_spkg_app_len = p_stream->ReceiveSRTP();
+        if (recv_spkg_app_len == -1)
+        {
+            LOG(WARNING,"timeout timer triggered, terminate the receiving thread");
+            break;
+        }
         LOG(DEBUG,"have received %d bytes succesfully", recv_spkg_app_len);
         recv_rtp_num++;
         LOG(DEBUG,"this is the %d srtp received", recv_rtp_num);
@@ -197,8 +202,7 @@ void* ReceiveDataThread(void *p)
         {
             LOG(ERROR, "failed to get rtp from queue, abnormal exit");
             exit(1);
-        }
-        
+        }        
         while(spkg_app_len != pStructRTP->pkg_len)
         {
             p_stream->m_rtpque.FreeCachedRTP(pStructRTP); // destroy the useless head in case memory leak
@@ -211,7 +215,6 @@ void* ReceiveDataThread(void *p)
             }
         }   
         // check if the rtp sequence is equal 
-
         while(seq > GetRtpSeq(pStructRTP->p_pkg))
         {
             LOG(WARNING,"the cached rtp seq is smaller than the decoded one, there must be pkg loss, to get the next one from queue");
@@ -238,6 +241,7 @@ void* ReceiveDataThread(void *p)
             exit(1);
         }    
     }
+    LOG(WARNING,"the rtp receiving thread exits");
 }
 int main(int argc, char **argv)
 {      
@@ -274,7 +278,7 @@ int main(int argc, char **argv)
         exit(1);
     }
     pthread_t thd_receiver;
-    int ret = pthread_create(&thd_receiver,NULL,ReceiveDataThread,&bidstream);
+    int ret = pthread_create(&thd_receiver,NULL,ReceiveSrtpThread,&bidstream);
     if (ret)
     {
         LOG(ERROR,"failed to create receiving thread, error No. is %d", ret);
@@ -295,7 +299,9 @@ int main(int argc, char **argv)
     	pcap_loop(fp, 0, dispatcher_handler, (u_char* )&bidstream);
     }
     // we have to wait sometime in case the last srtp pkg can be received by the receiving thread
-    usleep(100000);
+    //usleep(100000);
+    assert(pthread_join(thd_receiver,NULL) == 0);
+    LOG(DEBUG,"now the receiving rtp thread is confirmed terminated, so the main thread will exit soon");
     pcap_close(fp);
     CSrtppkgTranslator::DeInitSrtpLib();
     printf("all done, total sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d\n", sent_rtp_num, sent_rtcp_num, recv_rtp_num);

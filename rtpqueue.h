@@ -2,7 +2,7 @@
 #define _RTP_QUEUE_H
 
 #include "log.h"
-#define MAX_CACHED_RTP_NUM 5
+#define MAX_CACHED_RTP_NUM 40
 struct RAW_RTP
 {
     int pkg_len;
@@ -15,9 +15,9 @@ class CRtpQueue
         ~CRtpQueue();
         int EnQueue(const unsigned char *p, int len);
         RAW_RTP* DeQueue();
+	RAW_RTP* GetHeadOfQueue();
         inline bool IsFull() { return (capacity >= MAX_CACHED_RTP_NUM)?true:false; };
         inline bool IsEmpty() { return (capacity == 0)?true:false; };
-        void FreeCachedRTP(RAW_RTP *p);
         
 
     private:
@@ -26,6 +26,7 @@ class CRtpQueue
         int rear;
         int head;
         RAW_RTP m_raw_rtp_array[MAX_CACHED_RTP_NUM];
+        void FreeCachedRTP(RAW_RTP *p);
 };
 
 #endif

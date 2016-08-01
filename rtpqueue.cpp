@@ -42,8 +42,19 @@ RAW_RTP* CRtpQueue::DeQueue()
     int old_head = head;
     capacity--;
     head = (head+1)%MAX_CACHED_RTP_NUM;
-    LOG(DEBUG,"Have got the head of the queue: %d", old_head);
+    LOG(DEBUG,"Have got the head of the queue: %d, head got out of queue", old_head);
+    FreeCachedRTP(&m_raw_rtp_array[old_head]);
     return &m_raw_rtp_array[old_head];
+}
+RAW_RTP* CRtpQueue::GetHeadOfQueue()
+{
+	if (IsEmpty())
+	{
+		LOG(WARNING,"the queue is empty, this should not happen--failed to enqueue or multi-thread conflict?");
+		return NULL;
+	}
+    LOG(DEBUG,"Have got the head of the queue: %d", head);
+    return &m_raw_rtp_array[head];
 }
 void CRtpQueue::FreeCachedRTP(RAW_RTP *p)
 {

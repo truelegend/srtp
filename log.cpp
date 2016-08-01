@@ -12,27 +12,17 @@ CLog::CLog()
     //mutex_x = PTHREAD_MUTEX_INITIALIZER;
     int ret = pthread_mutex_init(&mutex_x, NULL);
     if (ret != 0)
-    {
-    	printf("error happend when try to initialize mutex\n");
-    }
+        printf("error happend when try to initialize mutex\n");
 }
 CLog::~CLog()
 {
-   if (instance)
-   {
-        delete instance;
-   }
-   if (m_logfile)
-   {
-       fclose(m_logfile);
-   }
-
-   int ret = pthread_mutex_destroy(&mutex_x);
-
-   if (ret != 0)
-    {
+    if (m_logfile)
+        fclose(m_logfile);
+    int ret = pthread_mutex_destroy(&mutex_x);
+    if (ret != 0)
     	printf("error happend when try to deinitialize mutex\n");
-    }
+    if (instance)
+        delete instance;
 }
 CLog* CLog::GetInstance()
 {

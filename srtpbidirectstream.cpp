@@ -37,7 +37,7 @@ CSrtpBidirectStream::CSrtpBidirectStream(char *local_addr,unsigned int local_por
 }
 CSrtpBidirectStream::~CSrtpBidirectStream()
 {
-    LOG(DEBUG,"close rtp/rtcp socket in ~CSrtpBidirectStream");
+    //LOG(DEBUG,"close rtp/rtcp socket in ~CSrtpBidirectStream");
 	close(m_rtp_sockfd);
     close(m_rtcp_sockfd);
 }

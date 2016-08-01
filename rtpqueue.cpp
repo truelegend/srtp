@@ -10,7 +10,7 @@ CRtpQueue::~CRtpQueue()
 {
     for(int i=0; i<MAX_CACHED_RTP_NUM; i++)
     {
-    	delete [] m_raw_rtp_array[i].p_pkg;
+    		delete [] m_raw_rtp_array[i].p_pkg;   	
     }
 }
 int CRtpQueue::EnQueue(const unsigned char *p, int len)
@@ -60,5 +60,6 @@ void CRtpQueue::FreeCachedRTP(RAW_RTP *p)
 {
 	LOG(DEBUG,"free the memory for RAW_RTP");
 	delete [] p->p_pkg;
+	p->p_pkg = NULL;
 	p->pkg_len = 0;
 }

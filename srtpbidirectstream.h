@@ -36,7 +36,7 @@ class CSrtpBidirectStream
         struct sockaddr_in     m_localaddr_rtcp;
         struct sockaddr_in     m_peeraddr_rtcp;
         int                    m_rtcp_sockfd;
-        static const int       TIMEOUT = 2;
+        static const int       TIMEOUT = 5;
 
 };
 

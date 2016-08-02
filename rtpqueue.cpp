@@ -23,7 +23,7 @@ int CRtpQueue::EnQueue(const unsigned char *p, int len)
 	rear = (rear+1)%MAX_CACHED_RTP_NUM;
 	if (m_raw_rtp_array[rear].p_pkg)
 	{
-		LOG(ERROR,"the pointer is not NULL here, it is not right")
+		LOG(ERROR,"the pointer is not NULL here, it is not right");
 		exit(1);
 	}
 	m_raw_rtp_array[rear].p_pkg = new u_char[len];

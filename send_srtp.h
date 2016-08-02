@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include <assert.h>
 #include <iostream>
+#include <sstream>
+#include <fstream>
 #include "srtpbidirectstream.h"
 #include "log.h"
 #include "rtpqueue.h"

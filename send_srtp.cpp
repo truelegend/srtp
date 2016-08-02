@@ -1,16 +1,18 @@
 #include "send_srtp.h"
-
+using namespace std;
 
 struct timeval pre_time;
 struct timeval cur_time;
 
-unsigned int sent_rtp_num        = 0;
-unsigned int sent_rtcp_num       = 0;
-unsigned int recv_rtp_num        = 0;
-unsigned int recv_rtcp_num       = 0;
-unsigned int error_recv_rtp_num  = 0;
-unsigned int correct_recv_rtp_num  = 0;
-unsigned int outorder_recv_rtp_num  = 0;
+unsigned int g_sent_rtp_num        = 0;
+unsigned int g_sent_rtcp_num       = 0;
+unsigned int g_recv_rtp_num        = 0;
+unsigned int g_recv_rtcp_num       = 0;
+unsigned int g_error_recv_rtp_num  = 0;
+unsigned int g_correct_recv_rtp_num  = 0;
+unsigned int g_outorder_recv_rtp_num  = 0;
+
+int g_mac_length = 0;
 
 pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -85,6 +87,30 @@ bool CArgumentsHandler::IsBase64keyCorrect(const char *str)
     }
     return true;
 }
+int GetMacLengthFromPcapfile(const char* filename)
+{
+    fstream file;
+    file.open(filename);
+    if (!file)
+    {
+        LOG(ERROR,"failed to open pcap file");
+        exit(1);
+    }
+    pcap_file_header pcaphdr;
+    file.read((char*)&pcaphdr,sizeof(pcaphdr));
+    file.close();
+    LOG(DEBUG,"the link type of pcap file is: %d", pcaphdr.linktype);
+    switch(pcaphdr.linktype)
+    {
+        case 1:
+            return 14;
+        case 113:
+            return 16;
+        default:
+            LOG(ERROR,"unsupported link type");
+            exit;
+    }
+}
 void CArgumentsHandler::Usage()
 {
     printf("usage:\n");
@@ -113,11 +139,11 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
         LOG(ERROR,"this captured pkg length is not equal with the actual real pkg length!");
 	    return;
     }
-    u_short port = ntohs(*(u_short*) (pkt_data+14+20));
+    u_short port = ntohs(*(u_short*) (pkt_data+g_mac_length+20));
     isRTCP = (port%2==0)?false:true;
     LOG(DEBUG,"the port number is %d, isRTCP is %d", port, isRTCP);
 
-    int pkg_app_len = header->len-42;  // 42 = 14 mac + 20 ip hdr + 8 udp hdr
+    int pkg_app_len = header->len-g_mac_length-20-8;  // 42 = 14 mac + 20 ip hdr + 8 udp hdr
     int orig_pkg_app_len = pkg_app_len;
     memcpy(p_stream->m_pRtpTranslator->m_pkg_buffer,pkt_data+14+20+8,orig_pkg_app_len);
     //printf("pkg_app_len is :%d before protection\n", pkg_app_len);
@@ -142,19 +168,19 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
         pthread_mutex_unlock(&g_mutex);     
         LOG(DEBUG,"the enqueued rear is %d", rear);
     }
-    if(sent_rtp_num == 0)
+    if(g_sent_rtp_num == 0)
     {
         if(isRTCP)
         {
             LOG(DEBUG,"send srtcp");
             p_stream->SendSRTCP(pkg_app_len);
-            sent_rtcp_num++;
+            g_sent_rtcp_num++;
         }
         else
         {
             LOG(DEBUG,"send srtp");
             p_stream->SendSRTP(pkg_app_len);
-            sent_rtp_num++; 
+            g_sent_rtp_num++; 
         }        	           
 	    pre_time = header->ts;
     }
@@ -167,17 +193,17 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
         {
             LOG(DEBUG,"send srtcp");
             p_stream->SendSRTCP(pkg_app_len);
-	        sent_rtcp_num++;
+	        g_sent_rtcp_num++;
         }
         else
         {
             LOG(DEBUG,"send srtp");
             p_stream->SendSRTP(pkg_app_len);
-	        sent_rtp_num++;
+	        g_sent_rtp_num++;
         }        
         pre_time = cur_time;
     }
-    LOG(DEBUG,"this is the %d srtp sent out, %d srtcp sent out", sent_rtp_num,sent_rtcp_num);
+    LOG(DEBUG,"this is the %d srtp sent out, %d srtcp sent out", g_sent_rtp_num,g_sent_rtcp_num);
 }
 u_short GetRtpSeq(u_char *pRTP)
 {
@@ -197,8 +223,8 @@ void* ReceiveSrtpThread(void *p)
             break;
         }
         LOG(DEBUG,"have received %d bytes succesfully", recv_spkg_app_len);
-        recv_rtp_num++;
-        LOG(DEBUG,"this is the %d srtp received", recv_rtp_num);
+        g_recv_rtp_num++;
+        LOG(DEBUG,"this is the %d srtp received", g_recv_rtp_num);
         int spkg_app_len = recv_spkg_app_len;
 
         p_stream->m_pSrtpTranslator->DecodeSRTP(&spkg_app_len);
@@ -207,7 +233,7 @@ void* ReceiveSrtpThread(void *p)
         LOG(DEBUG,"the received seq is %d", seq);
         pthread_mutex_lock(&g_mutex);   
         // RAW_RTP *pStructRTP = p_stream->m_rtpque.DeQueue();
-	RAW_RTP *pStructRTP = p_stream->m_rtpque.GetHeadOfQueue();
+	    RAW_RTP *pStructRTP = p_stream->m_rtpque.GetHeadOfQueue();
         if (!pStructRTP)
         {
             LOG(ERROR, "failed to get rtp head from queue, abnormal exit");
@@ -230,7 +256,7 @@ void* ReceiveSrtpThread(void *p)
             }
         }   
         // check if the rtp sequence is equal 
-	u_short seq_queue = GetRtpSeq(pStructRTP->p_pkg);
+	    u_short seq_queue = GetRtpSeq(pStructRTP->p_pkg);
         while(seq > seq_queue)
         {
             LOG(WARNING,"the cached rtp seq is smaller than the decoded one, there must be pkg loss or pkg out of order, to get the next one from queue");
@@ -246,14 +272,13 @@ void* ReceiveSrtpThread(void *p)
                 LOG(ERROR, "failed to get rtp from queue, abnormal exit");
                 exit(1);
             }
-	    seq_queue = GetRtpSeq(pStructRTP->p_pkg);
+	        seq_queue = GetRtpSeq(pStructRTP->p_pkg);
         }
-
 	if(seq < seq_queue)
 	{
             LOG(WARNING,"seq: %d != seq_queue: %d, there must be pkg out of order, drop the received pkg simply", seq, seq_queue);
             pthread_mutex_unlock(&g_mutex);
-	    outorder_recv_rtp_num++;
+	        g_outorder_recv_rtp_num++;
 	    continue;
 	}
         LOG(DEBUG,"now we can compare the two pkg since the length and seq are all equal");
@@ -262,15 +287,15 @@ void* ReceiveSrtpThread(void *p)
             LOG(DEBUG,"succesfully encode&decode, well done!\n");
             //p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
 	    p_stream->m_rtpque.DeQueue();
-	    correct_recv_rtp_num++;
+	    g_correct_recv_rtp_num++;
             pthread_mutex_unlock(&g_mutex); 
         }
         else
         {
             LOG(ERROR,"the comparing failed, there must be something wrong in encoding or decoding");
             //p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
-	    p_stream->m_rtpque.DeQueue();
-            error_recv_rtp_num++; 
+	        p_stream->m_rtpque.DeQueue();
+            g_error_recv_rtp_num++; 
             pthread_mutex_unlock(&g_mutex); 
             //exit(1);
         }    
@@ -316,8 +341,9 @@ int main(int argc, char **argv)
         LOG(ERROR,"failed to create receiving thread, error No. is %d", ret);
         exit(1);
     }
-    pcap_t *fp;
     const char *filename = argumentsHandler.m_pcap_file;
+    g_mac_length = GetMacLengthFromPcapfile(filename);
+    pcap_t *fp;
     char errbuf[50];
     if ((fp = pcap_open_offline(filename, errbuf)) == NULL)
     {
@@ -340,7 +366,7 @@ int main(int argc, char **argv)
     LOG(DEBUG,"now the receiving rtp thread is confirmed terminated, so the main thread will exit soon");
     CSrtppkgTranslator::DeInitSrtpLib();
     LOG(DEBUG,"all done, total sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d, successfuly compared rtp pkg: %d, unsuccessfully compared rtp pkg: %d, out of order srtp pkg: %d",
-		    sent_rtp_num, sent_rtcp_num, recv_rtp_num, correct_recv_rtp_num, error_recv_rtp_num, outorder_recv_rtp_num);
+		    g_sent_rtp_num, g_sent_rtcp_num, g_recv_rtp_num, g_correct_recv_rtp_num, g_error_recv_rtp_num, g_outorder_recv_rtp_num);
 }
 
 //256

@@ -7,22 +7,22 @@
    <send>
     <![CDATA[
 
-      INVITE sip:1234567890[call_number]@sha-it.mavenir.com SIP/2.0
+      INVITE sip:1234567890[call_number]@abc.com SIP/2.0
       Via: SIP/2.0/[transport] [local_ip]:[local_port];branch=[branch]
       Max-Forwards: 70
       Call-ID: caller[call_number]///[call_id]
       Require: not-supported
       From: <sip:[field0]@[field2]>;tag=[pid]UEMO[call_number]
-      To: <sip:1234567890[call_number]@sha-it.mavenir.com>
+      To: <sip:1234567890[call_number]@abc.com>
       CSeq: 1 INVITE
-      P-Preferred-Identity: "Default" <sip:+862161615501@sha-it.mavenir.com>
+      P-Preferred-Identity: "Default" <sip:+862161615501@abc.com>
       P-Preferred-Service: urn:urn-7:3gpp-service.exampletelephony.version1
       Contribution-ID: 11111111-f84c-427a-a05f-1f7b6d10d523
       Contribution-ID: 22222222-f84c-427a-a05f-1f7b6d10d523
       Supported: 100rel,eventlist
       User-Agent: SIPP
       Content-Type: application/sdp
-      Proxy-Authorization: Digest username="862161615511@sha-it.mavenir.com", realm="sha-it.mavenir.com", nonce="", uri="sip:sha-it.mavenir.com", response=""
+      Proxy-Authorization: Digest username="862161615511@abc.com", realm="abc.com", nonce="", uri="sip:abc.com", response=""
       P-Access-Network-Info: 3GPP-E-UTRAN-FDD;utran-cell-id-3gpp=2400784ed4ccca04
       Contact: <sip:[local_ip]:[local_port];transport=[transport]>
       Content-Length: [len]

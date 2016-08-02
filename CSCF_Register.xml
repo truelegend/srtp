@@ -15,7 +15,7 @@
 
       SIP/2.0 401 Unauthorized
       [last_Via:]
-      WWW-Authenticate: Digest realm="sha-it.mavenir.com",domain="sip:scscf.sha-it.mavenir.com",nonce="e2ac945bea2efc147e0e6b0b2586dd11",opaque="aW1zLmNvbS5jbg==",stale=TRUE,algorithm=MD5,qop="auth" 
+      WWW-Authenticate: Digest realm="abc.com",domain="sip:scscf.abc.com",nonce="e2ac945bea2efc147e0e6b0b2586dd11",opaque="aW1zLmNvbS5jbg==",stale=TRUE,algorithm=MD5,qop="auth" 
       [last_From:]
       [last_To:];tag=cscf-[call_number]
       [last_Call-ID:]
@@ -39,7 +39,7 @@
       SIP/2.0 200 OK
       [last_Via:]
       [last_Path:]
-      Service-Route: <sip:mavodi-1-4a-3fffffff-1-[call_number]@scscf.sha-it.mavenir.com:5080;lr>
+      Service-Route: <sip:mavodi-1-4a-3fffffff-1-[call_number]@scscf.abc.com:5080;lr>
       [last_From:]
       [last_To:];tag=cscf-[call_number]
       [last_Call-ID:]

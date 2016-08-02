@@ -81,9 +81,7 @@
 
   <nop>
     <action>
-	    <!--  <exec play_pcap_audio="/root/AutoTestEnv/UCG_COMMON/pcap/g711a.pcap"/>                    -->                                                                         
 	    <exec command="/root/srtp/send_srtp /root/srtp/rtp-rtcp.pcap [local_ip] 6100 [remote_ip] [$300] 256 80 '[$311]' '[$313]'"/>  
-	    <!-- <exec command="/home/libsrtp/test/rtpw -s -k 92d21fc2bc001ba55aba62924fe99d391880b34c191fe351e6365bc962b0 -e 128 -a [remote_ip] [$300]"/> -->
     </action>      
   </nop>    
 

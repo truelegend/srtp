@@ -10,23 +10,27 @@ struct RAW_RTP
 };
 class CRtpQueue
 {
-    public:
-    	CRtpQueue();
-        ~CRtpQueue();
-        int EnQueue(const unsigned char *p, int len);
-        RAW_RTP* DeQueue();
-	RAW_RTP* GetHeadOfQueue();
-        inline bool IsFull() { return (capacity >= MAX_CACHED_RTP_NUM)?true:false; };
-        inline bool IsEmpty() { return (capacity == 0)?true:false; };
-        
+public:
+    CRtpQueue();
+    ~CRtpQueue();
+    int EnQueue(const unsigned char *p, int len);
+    RAW_RTP* DeQueue();
+    RAW_RTP* GetHeadOfQueue();
+    inline bool IsFull() {
+        return (capacity >= MAX_CACHED_RTP_NUM)?true:false;
+    };
+    inline bool IsEmpty() {
+        return (capacity == 0)?true:false;
+    };
 
-    private:
-        
-        int capacity;
-        int rear;
-        int head;
-        RAW_RTP m_raw_rtp_array[MAX_CACHED_RTP_NUM];
-        void FreeCachedRTP(RAW_RTP *p);
+
+private:
+
+    int capacity;
+    int rear;
+    int head;
+    RAW_RTP m_raw_rtp_array[MAX_CACHED_RTP_NUM];
+    void FreeCachedRTP(RAW_RTP *p);
 };
 
 #endif

@@ -1,4 +1,6 @@
 #include "send_srtp.h"
+#include <map>
+#include "rtpqueue.h"
 using namespace std;
 
 struct timeval pre_time;
@@ -11,6 +13,7 @@ unsigned int g_recv_rtcp_num       = 0;
 unsigned int g_error_recv_rtp_num  = 0;
 unsigned int g_correct_recv_rtp_num  = 0;
 unsigned int g_outorder_recv_rtp_num  = 0;
+unsigned int g_recv_rtp_loss_num   =0;
 
 int g_mac_length = 0;
 
@@ -158,7 +161,6 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
         LOG(DEBUG,"start to encode rtp");
         p_stream->m_pRtpTranslator->EncodeRTP(&pkg_app_len);
     }
-
     //printf("pkg_app_len is :%d after protection\n", pkg_app_len);
     if (!isRTCP)
     {
@@ -210,9 +212,20 @@ u_short GetRtpSeq(u_char *pRTP)
     u_short seq = ntohs(*((u_short*)(pRTP+2)));
     return seq;
 }
+void BuildCachedRTPStruct(RAW_RTP *dst_rawrtp,const RAW_RTP* src_rawrtp)
+{
+    dst_rawrtp->pkg_len = src_rawrtp->pkg_len;
+    dst_rawrtp->p_pkg = new u_char[dst_rawrtp->pkg_len];
+    if (!dst_rawrtp->p_pkg)
+    {
+        LOG(ERROR,"failed to allocate memmory");
+        exit;
+    }
+    memcpy(dst_rawrtp->p_pkg,src_rawrtp->p_pkg,dst_rawrtp->pkg_len);
+}
 void* ReceiveSrtpThread(void *p)
 {
-    LOG(DEBUG,"enter into the receiving thread function");
+    map<u_short, RAW_RTP> map_recv_cache;
     CSrtpBidirectStream *p_stream = (CSrtpBidirectStream *)p;
     while(1)
     {
@@ -226,47 +239,47 @@ void* ReceiveSrtpThread(void *p)
         g_recv_rtp_num++;
         LOG(DEBUG,"this is the %d srtp received", g_recv_rtp_num);
         int spkg_app_len = recv_spkg_app_len;
-
         p_stream->m_pSrtpTranslator->DecodeSRTP(&spkg_app_len);
         LOG(DEBUG,"the decoded srtp length is %d", spkg_app_len);
         u_short seq = GetRtpSeq(p_stream->m_pSrtpTranslator->m_pkg_buffer);
-        LOG(DEBUG,"the received seq is %d", seq);
+        LOG(DEBUG,"the received rtp seq is %d", seq);
+        map<u_short,RAW_RTP>::iterator it = map_recv_cache.find(seq);
+        if (it != map_recv_cache.end())
+        {
+            g_outorder_recv_rtp_num++;
+            if (spkg_app_len == it->second.pkg_len 
+                && CompareMem(it->second.p_pkg,p_stream->m_pSrtpTranslator->m_pkg_buffer,spkg_app_len))
+            {
+                LOG(DEBUG,"out-of-order: succesfully encode&decode, well done!\n");
+                g_correct_recv_rtp_num++;
+            }
+            else
+            {
+                LOG(ERROR,"out-of-order: the comparing failed, there must be something wrong in encoding or decoding");
+                g_error_recv_rtp_num++;
+            }
+            //p_stream->m_rtpque.FreeCachedRTP(&it->second);
+            delete[] it->second.p_pkg;
+            map_recv_cache.erase(it);
+            continue;
+        }
         pthread_mutex_lock(&g_mutex);
-        // RAW_RTP *pStructRTP = p_stream->m_rtpque.DeQueue();
-        RAW_RTP *pStructRTP = p_stream->m_rtpque.GetHeadOfQueue();
+        RAW_RTP *pStructRTP = p_stream->m_rtpque.DeQueue();
         if (!pStructRTP)
         {
             LOG(ERROR, "failed to get rtp head from queue, abnormal exit");
             exit(1);
         }
-        while(spkg_app_len != pStructRTP->pkg_len)
-        {
-            LOG(WARNING,"the cached rtp length is not equal to the decoded one, get the next element until they are equal");
-            if(p_stream->m_rtpque.DeQueue() != pStructRTP)
-            {
-                LOG(ERROR,"this should not happpen, need to check why they are not equal");
-                exit(1);
-            }
-            //p_stream->m_rtpque.FreeCachedRTP(pStructRTP); // destroy the useless head in case memory leak
-            pStructRTP = p_stream->m_rtpque.GetHeadOfQueue();
-            if (!pStructRTP)
-            {
-                LOG(ERROR, "failed to get rtp from queue, abnormal exit");
-                exit(1);
-            }
-        }
         // check if the rtp sequence is equal
         u_short seq_queue = GetRtpSeq(pStructRTP->p_pkg);
         while(seq > seq_queue)
         {
-            LOG(WARNING,"the cached rtp seq is smaller than the decoded one, there must be pkg loss or pkg out of order, to get the next one from queue");
-            if(p_stream->m_rtpque.DeQueue() != pStructRTP)
-            {
-                LOG(ERROR,"this should not happpen, need to check why they are not equal");
-                exit(1);
-            }
-            //p_stream->m_rtpque.FreeCachedRTP(pStructRTP); // destroy the useless head in case memory leak
-            pStructRTP = p_stream->m_rtpque.GetHeadOfQueue();
+            LOG(WARNING,"the cached sent rtp seq is smaller, put it into recv rtp cache map firstly");
+            RAW_RTP rawrtp;
+            BuildCachedRTPStruct(&rawrtp,pStructRTP);
+            map_recv_cache.insert(map<u_short,RAW_RTP>::value_type(seq_queue,rawrtp));
+            p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
+            pStructRTP = p_stream->m_rtpque.DeQueue();//   GetHeadOfQueue();
             if (!pStructRTP)
             {
                 LOG(ERROR, "failed to get rtp from queue, abnormal exit");
@@ -274,31 +287,35 @@ void* ReceiveSrtpThread(void *p)
             }
             seq_queue = GetRtpSeq(pStructRTP->p_pkg);
         }
-        if(seq < seq_queue)
+        if(seq != seq_queue)
         {
-            LOG(WARNING,"seq: %d != seq_queue: %d, there must be pkg out of order, drop the received pkg simply", seq, seq_queue);
+            LOG(ERROR,"seq: %d != seq_queue: %d, there should not happen", seq, seq_queue);
+            p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
             pthread_mutex_unlock(&g_mutex);
-            g_outorder_recv_rtp_num++;
-            continue;
+            exit(1);
         }
         LOG(DEBUG,"now we can compare the two pkg since the length and seq are all equal");
-        if (CompareMem(pStructRTP->p_pkg,p_stream->m_pSrtpTranslator->m_pkg_buffer,spkg_app_len))
+        if (spkg_app_len == pStructRTP->pkg_len
+            && CompareMem(pStructRTP->p_pkg,p_stream->m_pSrtpTranslator->m_pkg_buffer,spkg_app_len))
         {
             LOG(DEBUG,"succesfully encode&decode, well done!\n");
-            //p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
-            p_stream->m_rtpque.DeQueue();
             g_correct_recv_rtp_num++;
-            pthread_mutex_unlock(&g_mutex);
         }
         else
         {
             LOG(ERROR,"the comparing failed, there must be something wrong in encoding or decoding");
-            //p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
-            p_stream->m_rtpque.DeQueue();
             g_error_recv_rtp_num++;
-            pthread_mutex_unlock(&g_mutex);
             //exit(1);
         }
+        p_stream->m_rtpque.FreeCachedRTP(pStructRTP);
+        pthread_mutex_unlock(&g_mutex);    
+    }
+    g_recv_rtp_loss_num = map_recv_cache.size();
+    LOG(WARNING,"the map size (the lost pkg) is %d",g_recv_rtp_loss_num);
+    for (map<u_short,RAW_RTP>::iterator it = map_recv_cache.begin(); it != map_recv_cache.end(); ++it)
+    {
+        //p_stream->m_rtpque.FreeCachedRTP(&it->second);
+        delete[] it->second.p_pkg;
     }
     LOG(WARNING,"the rtp receiving thread exits");
 }
@@ -365,8 +382,13 @@ int main(int argc, char **argv)
     }
     LOG(DEBUG,"now the receiving rtp thread is confirmed terminated, so the main thread will exit soon");
     CSrtppkgTranslator::DeInitSrtpLib();
-    LOG(DEBUG,"all done, total sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d, successfuly compared rtp pkg: %d, unsuccessfully compared rtp pkg: %d, out of order srtp pkg: %d",
-        g_sent_rtp_num, g_sent_rtcp_num, g_recv_rtp_num, g_correct_recv_rtp_num, g_error_recv_rtp_num, g_outorder_recv_rtp_num);
+    if (g_recv_rtp_loss_num != (g_sent_rtp_num - g_recv_rtp_num))
+    {
+        LOG(ERROR,"the calculated lost rtp number is not equal, %d:%d",g_recv_rtp_loss_num,g_sent_rtp_num-g_recv_rtp_num);
+    }
+    LOG(DEBUG,"all done! sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d, successfuly compared rtp pkg: %d, failed compared rtp pkg: %d, 
+        out-of-order srtp pkg: %d, lost srtp pkg: %d",
+        g_sent_rtp_num, g_sent_rtcp_num, g_recv_rtp_num, g_correct_recv_rtp_num, g_error_recv_rtp_num, g_outorder_recv_rtp_num, g_recv_rtp_loss_num);
 }
 
 //256

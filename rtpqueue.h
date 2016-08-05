@@ -15,7 +15,8 @@ public:
     ~CRtpQueue();
     int EnQueue(const unsigned char *p, int len);
     RAW_RTP* DeQueue();
-    RAW_RTP* GetHeadOfQueue();
+    void FreeCachedRTP(RAW_RTP *p);
+    //RAW_RTP* GetHeadOfQueue();
     inline bool IsFull() {
         return (capacity >= MAX_CACHED_RTP_NUM)?true:false;
     };
@@ -30,7 +31,7 @@ private:
     int rear;
     int head;
     RAW_RTP m_raw_rtp_array[MAX_CACHED_RTP_NUM];
-    void FreeCachedRTP(RAW_RTP *p);
+    
 };
 
 #endif

@@ -9,7 +9,11 @@ CRtpQueue::CRtpQueue()
 CRtpQueue::~CRtpQueue()
 {
     for(int i=0; i<MAX_CACHED_RTP_NUM; i++)
-    {
+    {   //LOG(DEBUG, "deconstructor: %d", i);
+        if (capacity == 0 && m_raw_rtp_array[i].p_pkg)
+        {
+            LOG(ERROR,"strange!!!!!!!!!!!!!");
+        }
         delete [] m_raw_rtp_array[i].p_pkg;
     }
 }
@@ -23,8 +27,8 @@ int CRtpQueue::EnQueue(const unsigned char *p, int len)
     rear = (rear+1)%MAX_CACHED_RTP_NUM;
     if (m_raw_rtp_array[rear].p_pkg)
     {
-        LOG(ERROR,"the pointer is not NULL here, it is not right");
-        exit(1);
+        LOG(WARNING,"the pointer is not NULL here, the memory should be released somewhere else!!!");
+        //exit(1);
     }
     m_raw_rtp_array[rear].p_pkg = new u_char[len];
     if (!m_raw_rtp_array[rear].p_pkg)
@@ -48,10 +52,10 @@ RAW_RTP* CRtpQueue::DeQueue()
     capacity--;
     head = (head+1)%MAX_CACHED_RTP_NUM;
     LOG(DEBUG,"Have got the head of the queue: %d, head got out of queue", old_head);
-    FreeCachedRTP(&m_raw_rtp_array[old_head]);
+    //FreeCachedRTP(&m_raw_rtp_array[old_head]);
     return &m_raw_rtp_array[old_head];
 }
-RAW_RTP* CRtpQueue::GetHeadOfQueue()
+/*RAW_RTP* CRtpQueue::GetHeadOfQueue()
 {
     if (IsEmpty())
     {
@@ -60,7 +64,7 @@ RAW_RTP* CRtpQueue::GetHeadOfQueue()
     }
     LOG(DEBUG,"Have got the head of the queue: %d", head);
     return &m_raw_rtp_array[head];
-}
+}*/
 void CRtpQueue::FreeCachedRTP(RAW_RTP *p)
 {
     LOG(DEBUG,"free the memory for RAW_RTP");

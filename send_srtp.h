@@ -43,4 +43,6 @@ private:
     bool IsBase64keyCorrect(const char *base64_key);
 };
 
+
+u_short GetRtpSeq(const u_char *pRTP);
 #endif

@@ -148,7 +148,7 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
 
     int pkg_app_len = header->len-g_mac_length-20-8;  // 42 = 14 mac + 20 ip hdr + 8 udp hdr
     int orig_pkg_app_len = pkg_app_len;
-    memcpy(p_stream->m_pRtpTranslator->m_pkg_buffer,pkt_data+14+20+8,orig_pkg_app_len);
+    memcpy(p_stream->m_pRtpTranslator->m_pkg_buffer,pkt_data+g_mac_length+20+8,orig_pkg_app_len);
     //printf("pkg_app_len is :%d before protection\n", pkg_app_len);
     // need to input the whole rtp pkg len, not just the payload
     if (isRTCP)
@@ -164,9 +164,10 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
     //printf("pkg_app_len is :%d after protection\n", pkg_app_len);
     if (!isRTCP)
     {
-        LOG(DEBUG,"for sent srtp, we'll cache the original rtp pkg");
+	u_short seq_queue = GetRtpSeq(pkt_data+g_mac_length+20+8);
+        LOG(DEBUG,"for sent srtp, we'll cache the original rtp pkg, seq is %d", seq_queue);
         pthread_mutex_lock(&g_mutex);
-        int rear = p_stream->m_rtpque.EnQueue(pkt_data+14+20+8,orig_pkg_app_len);
+        int rear = p_stream->m_rtpque.EnQueue(pkt_data+g_mac_length+20+8,orig_pkg_app_len);
         pthread_mutex_unlock(&g_mutex);
         LOG(DEBUG,"the enqueued rear is %d", rear);
     }
@@ -207,7 +208,7 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
     }
     LOG(DEBUG,"this is the %d srtp sent out, %d srtcp sent out", g_sent_rtp_num,g_sent_rtcp_num);
 }
-u_short GetRtpSeq(u_char *pRTP)
+u_short GetRtpSeq(const u_char *pRTP)
 {
     u_short seq = ntohs(*((u_short*)(pRTP+2)));
     return seq;
@@ -240,7 +241,6 @@ void* ReceiveSrtpThread(void *p)
         LOG(DEBUG,"this is the %d srtp received", g_recv_rtp_num);
         int spkg_app_len = recv_spkg_app_len;
         p_stream->m_pSrtpTranslator->DecodeSRTP(&spkg_app_len);
-        LOG(DEBUG,"the decoded srtp length is %d", spkg_app_len);
         u_short seq = GetRtpSeq(p_stream->m_pSrtpTranslator->m_pkg_buffer);
         LOG(DEBUG,"the received rtp seq is %d", seq);
         map<u_short,RAW_RTP>::iterator it = map_recv_cache.find(seq);
@@ -250,12 +250,12 @@ void* ReceiveSrtpThread(void *p)
             if (spkg_app_len == it->second.pkg_len 
                 && CompareMem(it->second.p_pkg,p_stream->m_pSrtpTranslator->m_pkg_buffer,spkg_app_len))
             {
-                LOG(DEBUG,"out-of-order: succesfully encode&decode, well done!\n");
+                LOG(DEBUG,"out-of-order: seq %d succesfully encode&decode, well done!\n", seq);
                 g_correct_recv_rtp_num++;
             }
             else
             {
-                LOG(ERROR,"out-of-order: the comparing failed, there must be something wrong in encoding or decoding");
+                LOG(ERROR,"out-of-order: seq %d the comparing failed, there must be something wrong in encoding or decoding\n", seq);
                 g_error_recv_rtp_num++;
             }
             //p_stream->m_rtpque.FreeCachedRTP(&it->second);
@@ -386,7 +386,7 @@ int main(int argc, char **argv)
     {
         LOG(ERROR,"the calculated lost rtp number is not equal, %d:%d",g_recv_rtp_loss_num,g_sent_rtp_num-g_recv_rtp_num);
     }
-    LOG(DEBUG,"all done! sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d, successfuly compared rtp pkg: %d, failed compared rtp pkg: %d, 
+    LOG(DEBUG,"all done! sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d, successfuly compared rtp pkg: %d, failed compared rtp pkg: %d, \
         out-of-order srtp pkg: %d, lost srtp pkg: %d",
         g_sent_rtp_num, g_sent_rtcp_num, g_recv_rtp_num, g_correct_recv_rtp_num, g_error_recv_rtp_num, g_outorder_recv_rtp_num, g_recv_rtp_loss_num);
 }

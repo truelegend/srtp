@@ -384,11 +384,10 @@ int main(int argc, char **argv)
     CSrtppkgTranslator::DeInitSrtpLib();
     if (g_recv_rtp_loss_num != (g_sent_rtp_num - g_recv_rtp_num))
     {
-        LOG(ERROR,"the calculated lost rtp number is not equal, %d:%d",g_recv_rtp_loss_num,g_sent_rtp_num-g_recv_rtp_num);
+        LOG(ERROR,"the calculated lost rtp number is not equal, %d:%d, if rtp sendqueue is ever full, then this is OK",g_recv_rtp_loss_num,g_sent_rtp_num-g_recv_rtp_num);
     }
-    LOG(DEBUG,"all done! sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d, successfuly compared rtp pkg: %d, failed compared rtp pkg: %d, \
-        out-of-order srtp pkg: %d, lost srtp pkg: %d",
-        g_sent_rtp_num, g_sent_rtcp_num, g_recv_rtp_num, g_correct_recv_rtp_num, g_error_recv_rtp_num, g_outorder_recv_rtp_num, g_recv_rtp_loss_num);
+    LOG(DEBUG,"all done! sent rtp pkg: %d, sent rtcp pkg: %d, received rtp pkg: %d, successfuly compared rtp pkg: %d, failed compared rtp pkg: %d, out-of-order srtp pkg: %d, lost srtp pkg: %d",
+        g_sent_rtp_num, g_sent_rtcp_num, g_recv_rtp_num, g_correct_recv_rtp_num, g_error_recv_rtp_num, g_outorder_recv_rtp_num, g_sent_rtp_num - g_recv_rtp_num);
 }
 
 //256

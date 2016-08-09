@@ -2,7 +2,7 @@ This project will generate one program called "send_srtp", it's main purpose is 
 
 The real deployment will make use of sipp to complete the sdp negotiation, i.e. srtp related parameter. 
 This project depends on libsrtp and pcap library, check the Makefile for details.
-
+For now, four suites are supported: AES_CM_128_HMAC_SHA1_80,AES_CM_128_HMAC_SHA1_32,AES_256_CM_HMAC_SHA1_32,AES_256_CM_HMAC_SHA1_80
 
 The network topology is:
 

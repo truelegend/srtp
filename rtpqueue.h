@@ -2,7 +2,7 @@
 #define _RTP_QUEUE_H
 
 #include "log.h"
-#define MAX_CACHED_RTP_NUM 40
+#define MAX_CACHED_RTP_NUM 340
 struct RAW_RTP
 {
     int pkg_len;

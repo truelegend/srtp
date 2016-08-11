@@ -32,6 +32,7 @@ public:
     int                      m_cipher_key_len;
     int                      m_enc_type;
     int                      m_auth_type;
+    int                      m_iptype;
     CArgumentsHandler(int argc, char **argv);
     bool VerifyArguments();
     void Usage();

@@ -161,17 +161,15 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
     {
         LOG(DEBUG,"start to encode rtp");
         p_stream->m_pRtpTranslator->EncodeRTP(&pkg_app_len);
-    }
-    //printf("pkg_app_len is :%d after protection\n", pkg_app_len);
-    if (!isRTCP)
-    {
-	u_short seq_queue = GetRtpSeq(pkt_data+g_mac_length+20+8);
+        u_short seq_queue = GetRtpSeq(pkt_data+g_mac_length+20+8);
         LOG(DEBUG,"for sent srtp, we'll cache the original rtp pkg, seq is %d", seq_queue);
         pthread_mutex_lock(&g_mutex);
         int rear = p_stream->m_rtpque.EnQueue(pkt_data+g_mac_length+20+8,orig_pkg_app_len);
         pthread_mutex_unlock(&g_mutex);
         LOG(DEBUG,"the enqueued rear is %d", rear);
     }
+    //printf("pkg_app_len is :%d after protection\n", pkg_app_len);
+
     if(g_sent_rtp_num == 0)
     {
         if(isRTCP)

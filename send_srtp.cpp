@@ -15,6 +15,7 @@ unsigned int g_correct_recv_rtp_num  = 0;
 unsigned int g_outorder_recv_rtp_num  = 0;
 unsigned int g_recv_rtp_loss_num   =0;
 
+static u_short g_start_seq  =    65500;
 int g_mac_length = 0;
 
 pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -133,6 +134,11 @@ bool CompareMem(const unsigned char *dst, const unsigned char *src, int len)
     }
     return true;
 }
+void SetRtpSeq(u_char *pRTP)
+{
+    *(u_short*)(pRTP+2) = htons(g_start_seq);
+    g_start_seq++;
+}
 void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u_char *pkt_data)
 {
     bool isRTCP;
@@ -159,9 +165,11 @@ void dispatcher_handler(u_char *temp1, const struct pcap_pkthdr *header, const u
     }
     else
     {
+        //LOG(DEBUG,"start to set rtp sequence");
+        //SetRtpSeq(p_stream->m_pRtpTranslator->m_pkg_buffer);
         LOG(DEBUG,"start to encode rtp");
         p_stream->m_pRtpTranslator->EncodeRTP(&pkg_app_len);
-        u_short seq_queue = GetRtpSeq(pkt_data+g_mac_length+20+8);
+        u_short seq_queue = GetRtpSeq(p_stream->m_pRtpTranslator->m_pkg_buffer);
         LOG(DEBUG,"for sent srtp, we'll cache the original rtp pkg, seq is %d", seq_queue);
         pthread_mutex_lock(&g_mutex);
         int rear = p_stream->m_rtpque.EnQueue(pkt_data+g_mac_length+20+8,orig_pkg_app_len);
@@ -224,7 +232,7 @@ void BuildCachedRTPStruct(RAW_RTP *dst_rawrtp,const RAW_RTP* src_rawrtp)
     memcpy(dst_rawrtp->p_pkg,src_rawrtp->p_pkg,dst_rawrtp->pkg_len);
 }
 void* ReceiveSrtpThread(void *p)
-{
+{   //return NULL;
     map<u_short, RAW_RTP> map_recv_cache;
     CSrtpBidirectStream *p_stream = (CSrtpBidirectStream *)p;
     while(1)

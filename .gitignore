@@ -1,3 +1,4 @@
 *.o
 send_srtp
 *.exe
+*.pcap *.cap

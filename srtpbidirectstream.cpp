@@ -104,7 +104,13 @@ CSrtpBidirectStream::CSrtpBidirectStream(char *local_addr,unsigned int local_por
         LOG(ERROR,"failed to set TIMEOUT for receiving socket");
         exit(1);
     }
-    memcpy(&m_new_local_rtpaddr,res->ai_addr,SOCK_ADDR_SIZE((struct sockaddr_storage *)res->ai_addr));
+    int size = SOCK_ADDR_SIZE((struct sockaddr_storage *)res->ai_addr);
+    if (size != res->ai_addrlen)
+    {
+        LOG(ERROR,"the addrlen is not equal, exit!");
+        exit(1);
+    }
+    memcpy(&m_new_local_rtpaddr,res->ai_addr,res->ai_addrlen);
     freeaddrinfo(res);
     
     char str_peerport[10];

@@ -33,7 +33,7 @@ CArgumentsHandler::CArgumentsHandler(int argc, char **argv)
 }
 bool CArgumentsHandler::VerifyArguments()
 {
-    if(m_argc != 11)
+    if(m_argc != 10)
     {
         LOG(ERROR,"the arguments number is wrong");
         Usage();
@@ -68,7 +68,6 @@ bool CArgumentsHandler::VerifyArguments()
     {
         return false;
     }
-    m_iptype = atoi(m_argv[10]);
     return true;
 }
 bool CArgumentsHandler::IsBase64keyCorrect(const char *str)
@@ -341,7 +340,7 @@ int main(int argc, char **argv)
                                       SRTP, argumentsHandler.m_peer_base64_key);
 
     CSrtpBidirectStream bidstream(argumentsHandler.m_local_addr,argumentsHandler.m_local_port,
-                                  argumentsHandler.m_peer_addr,argumentsHandler.m_peer_port,argumentsHandler.m_iptype);
+                                  argumentsHandler.m_peer_addr,argumentsHandler.m_peer_port);
     bidstream.m_pSrtpTranslator = &srtp_tranlator;
     bidstream.m_pRtpTranslator  = &rtp_tranlator;
 

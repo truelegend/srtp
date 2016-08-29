@@ -1,5 +1,4 @@
 #include "log.h"
-
 CLog* CLog::instance = NULL;
 CLog::CLog()
 {
